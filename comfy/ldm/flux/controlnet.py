@@ -5,6 +5,7 @@ import torch
 import math
 from torch import Tensor, nn
 from einops import rearrange, repeat
+import torch.nn.functional as F
 
 from .layers import (DoubleStreamBlock, EmbedND, LastLayer,
                                  MLPEmbedder, SingleStreamBlock,
@@ -187,6 +188,13 @@ class ControlNetFlux(Flux):
             hint = hint * 2.0 - 1.0
             hint = self.input_hint_block(hint)
 
+        # 确保 hint 的形状可以被 patch_size 整除
+        h, w = hint.shape[2], hint.shape[3]
+        if h % patch_size != 0 or w % patch_size != 0:
+            pad_h = patch_size - (h % patch_size) if h % patch_size != 0 else 0
+            pad_w = patch_size - (w % patch_size) if w % patch_size != 0 else 0
+            hint = F.pad(hint, (0, pad_w, 0, pad_h))
+        
         hint = rearrange(hint, "b c (h ph) (w pw) -> b (h w) (c ph pw)", ph=patch_size, pw=patch_size)
 
         bs, c, h, w = x.shape
